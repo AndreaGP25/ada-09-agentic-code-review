@@ -1,7 +1,11 @@
 """Unit tests for CustomerSearchService."""
 
 import time
+import unicodedata
 
+import pytest
+
+from src.domain.exceptions import InvalidQueryError
 from src.domain.models import Customer
 from src.repository.customer_repository import InMemoryCustomerRepository
 from src.services.search_service import CustomerSearchService
@@ -216,6 +220,7 @@ def test_search_accented_email_matching() -> None:
     assert len(results_accented) == 1
     assert results_accented[0].email == "josé.pérez@empresa.es"
 
+
 def test_search_accented_with_surrounding_whitespace() -> None:
     """CR-01: Accented query with leading and trailing whitespace is trimmed and matches."""
     custom_records = [
@@ -245,3 +250,60 @@ def test_search_short_accented_valid_query() -> None:
     results = service.search("él")
     assert len(results) == 1
     assert results[0].name == "Élise Dupont"
+
+
+@pytest.mark.parametrize(
+    "combining_query",
+    ["\u0301\u0301", "\u0300\u0301\u0302", "   \u0301\u0301   ", "\t\u0303\u0308\t"],
+)
+def test_search_combining_characters_only_raises_invalid_query_error(
+    combining_query: str,
+) -> None:
+    """RF-01 / RF-02: Queries composed only of combining marks normalize to empty and are rejected."""
+    service = CustomerSearchService()
+    with pytest.raises(InvalidQueryError, match="Query cannot be empty or whitespace"):
+        service.search(combining_query)
+
+
+@pytest.mark.parametrize(
+    "decomposed_single_char",
+    [
+        unicodedata.normalize("NFD", "é"),
+        unicodedata.normalize("NFD", "á"),
+        unicodedata.normalize("NFD", "ó"),
+        "e\u0301",
+        "  a\u0301  ",
+    ],
+)
+def test_search_decomposed_single_character_query_raises_invalid_query_error(
+    decomposed_single_char: str,
+) -> None:
+    """RF-01 / RF-02: Decomposed single characters (len=2 raw, len=1 normalized) are rejected."""
+    service = CustomerSearchService()
+    with pytest.raises(InvalidQueryError, match="Query must be at least 2 characters long"):
+        service.search(decomposed_single_char)
+
+
+@pytest.mark.parametrize(
+    ("decomposed_query", "expected_name"),
+    [
+        (unicodedata.normalize("NFD", "maría"), "Maria Garcia"),
+        (unicodedata.normalize("NFD", "lópez"), "Omar Lopez"),
+        (unicodedata.normalize("NFD", "élise"), "Élise Dupont"),
+    ],
+)
+def test_search_decomposed_multicharacter_query_matches(
+    decomposed_query: str, expected_name: str
+) -> None:
+    """RF-02: Multi-character decomposed Unicode (NFD) queries match unaccented and accented records."""
+    custom_records = [
+        Customer(id="801", name="Maria Garcia", email="maria@example.com"),
+        Customer(id="802", name="Omar Lopez", email="omar@example.com"),
+        Customer(id="803", name="Élise Dupont", email="elise@france.fr"),
+    ]
+    repo = InMemoryCustomerRepository(customers=custom_records)
+    service = CustomerSearchService(repository=repo)
+
+    results = service.search(decomposed_query)
+    result_names = [c.name for c in results]
+    assert expected_name in result_names

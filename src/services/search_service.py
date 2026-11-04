@@ -54,6 +54,11 @@ class CustomerSearchService:
             raise InvalidQueryError("Query must be at least 2 characters long")
 
         normalized_query = _normalize_text(trimmed_query)
+        if not normalized_query:
+            raise InvalidQueryError("Query cannot be empty or whitespace")
+
+        if len(normalized_query) < 2:
+            raise InvalidQueryError("Query must be at least 2 characters long")
 
         results: List[Customer] = []
         for customer in self._repository.get_all():
