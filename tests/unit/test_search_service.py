@@ -215,3 +215,33 @@ def test_search_accented_email_matching() -> None:
     results_accented = service.search("josé.pérez")
     assert len(results_accented) == 1
     assert results_accented[0].email == "josé.pérez@empresa.es"
+
+def test_search_accented_with_surrounding_whitespace() -> None:
+    """CR-01: Accented query with leading and trailing whitespace is trimmed and matches."""
+    custom_records = [
+        Customer(id="601", name="Ángel Morales", email="angel.morales@example.com"),
+    ]
+    repo = InMemoryCustomerRepository(customers=custom_records)
+    service = CustomerSearchService(repository=repo)
+
+    results = service.search("   ángel   ")
+    assert len(results) == 1
+    assert results[0].name == "Ángel Morales"
+
+    # Match unaccented with surrounding whitespace
+    results_unaccented = service.search("   angel   ")
+    assert len(results_unaccented) == 1
+    assert results_unaccented[0].name == "Ángel Morales"
+
+
+def test_search_short_accented_valid_query() -> None:
+    """CR-01: Two-character accented query passes validation and normalizes correctly."""
+    custom_records = [
+        Customer(id="701", name="Élise Dupont", email="elise@france.fr"),
+    ]
+    repo = InMemoryCustomerRepository(customers=custom_records)
+    service = CustomerSearchService(repository=repo)
+
+    results = service.search("él")
+    assert len(results) == 1
+    assert results[0].name == "Élise Dupont"
