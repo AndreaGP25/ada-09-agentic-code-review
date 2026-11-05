@@ -31,6 +31,6 @@ Reason:
 The Reviewer Agent flagged in-loop redundant normalization ($2N$ calls to `_normalize_text()` per search) and outdated paths in `docs/REPO_MAP.md`. While caching or pre-computing normalized fields would optimize performance for large datasets, current benchmark execution against the mock repository takes < 1 ms, well below the NFR-01 requirement (< 100 ms). Adding caching or altering repository data structures at this stage introduces premature optimization and unnecessary complexity out of scope for CR-01. Pre-existing documentation drift in `docs/REPO_MAP.md` will be addressed in a future repository maintenance task.
  
 ## Human Gate 
-[X] Return to coder-agent 
-[ ] Ready for final re-review 
+[ ] Return to coder-agent 
+[X] Ready for final re-review 
 [ ] Stop / escalate 
